@@ -1,6 +1,4 @@
 # A-Level-CS-NEA-Pulse
-This is my A-Level Computer Science NEA Project Named 'Pulse' and Aims to be a DAW with Integrated Mixing
+This is my A-Level Computer Science NEA Project Named 'Pulse' and Aims to be an Auto Mixing Application
 
-This will aim to be a simple DAW based on Audacity, however, the main focus is on the automated mixing/ DJ tool 
-which will try to use basic music theory in tandem with mixing tools to automatically mix songs/ mix suggested songs 
-for the user
+This will aim to be an automatic mixing tool that is able to identify songs and their key musical features (BPM, Key, Genre, Time Signature). Through this, the Application will aim to either suggest songs or allow you to provide your own songs.
