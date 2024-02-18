@@ -1,0 +1,579 @@
+# Pulse Beta 5 | Made by Alexander Richard Dennant | NEA Project for Computer Science
+
+# Imports —————————————————————————————————————————————
+import os
+import time
+import asyncio
+import sqlite3
+import requests
+import itertools
+import threading
+from io import BytesIO
+from pytube import YouTube
+from shazamio import Shazam
+from PIL import ImageTk, Image
+from customtkinter import CTk as ctk
+from tkinter import messagebox, filedialog
+from customtkinter import CTkLabel, CTkButton, CTkFrame, CTkImage
+
+# Global Variables —————————————————————————————————————————————
+verbose = False # Verbose Mode
+
+# Classes —————————————————————————————————————————————
+
+# StartupMenu Class —————————————————————————————————————————————
+class StartupMenu: # StartupMenu class defines the startup menu of the application
+    def __init__(self): 
+        self.title_label = None 
+        self.button_frame = None 
+        self.related_songs = [] 
+        self.processing = False 
+        self.subtitle_label = None 
+        self.identified_song = "" 
+        self.internet_connected = True
+        self.song_details_list = []
+
+    # Creates GUI —————————————————————————————————————————————
+
+    def create_window(self): # create_window method sets up the window and UI components
+        self.ctk_root = ctk() # Create the Tkinter root window
+        self.ctk_root.after(0, self.check_internet)  # Call the check_internet method
+        self.ctk_root.title("PULSE: Startup Menu") # Set the title of the window
+        self.ctk_root.resizable(False, False) # Disable resizing of the window
+        self.center_window(500, 240) # Center the window on the screen
+
+        self.title_label = CTkLabel(self.ctk_root, text="PULSE", font=("Helvetica", 30, "bold")) # Create the title label
+        self.title_label.pack(padx=20, pady=(20, 0)) # Pack the title label with padding
+
+        self.subtitle_label = CTkLabel(self.ctk_root, text="Startup menu", font=("Helvetica", 12)) # Create the subtitle label
+        self.subtitle_label.pack(padx=20, pady=(0, 20)) # Pack the subtitle label with padding
+
+        self.internet_label = CTkLabel(self.ctk_root, text="Internet: Validating", font=("Helvetica", 10)) # Create the internet status label
+        self.internet_label.pack(padx=20, pady=(0, 20)) # Pack the internet status label with padding
+
+        self.button_frame = CTkFrame(self.ctk_root) # Create a frame for the buttons
+        self.button_frame.pack(side="bottom", pady=20) # Pack the button frame at the bottom of the window with padding
+
+        CTkButton(self.button_frame, text='Exit', command=self.exit_program).pack(side="left", padx=(0, 5)) # Create and pack the 'Exit' button, which calls the exit_program method when clicked
+        CTkButton(self.button_frame, text='Open File', command=self.open_file).pack(side="left", padx=(5, 5)) # Create and pack the 'Open File' button, which calls the open_file method when clicked
+        CTkButton(self.button_frame, text='Verbose Mode', command=self.verbose_mode).pack(side="left", padx=(5, 0)) # Create and pack the 'Open URL' button, which calls the open_url method when clicked
+
+        self.ctk_root.mainloop() # Start the Tkinter event loop
+
+    def verbose_mode(self):  # developer_menu method opens the developer menu
+        global verbose  # Global variable
+        verbose = not verbose  # Toggle the verbose variable
+        if verbose == True: # If verbose mode is enabled, print a message to the console
+            print("Startup Menu Debug Mode Enabled")  # Print a message to the console
+        else: # If verbose mode is disabled, print a message to the console
+            print("Startup Menu Debug Mode Disabled")  # Print a message to the console
+
+    def center_window(self, width=500, height=240): # center_window method centers the window on the screen
+        screen_width = self.ctk_root.winfo_screenwidth() # Get the screen width and height
+        screen_height = self.ctk_root.winfo_screenheight() # Get the screen width and height
+        x = (screen_width / 2) - (width / 2) # Calculate the x coordinate to center the window
+        y = (screen_height / 2) - (height / 2) # Calculate the y coordinate to center the window
+        self.ctk_root.geometry('%dx%d+%d+%d' % (width, height, x, y)) # Set the geometry of the window to center it on the screen
+    
+    def animate_processing_label(self): # animate_processing_label method animates the processing label
+        dots = itertools.cycle([".", "..", "..."]) # Create an iterator for the dots
+        while self.processing: # While the processing variable is True, update the text of the internet label
+            text = f"Processing {next(dots)}" # Set the text of the internet label
+            self.internet_label.configure(text=text) # Update the text of the internet label
+            self.ctk_root.update() # Update the window
+            time.sleep(0.5) # Wait for 0.5 seconds
+
+    # Internet Connection Check —————————————————————————————————————————————
+
+    def update_internet_label(self): # update_internet_label method updates the text of the internet label
+        if self.internet_connected and self.internet_label.winfo_exists(): # If the internet is connected and the internet label exists, update the text
+            text = "Internet: Connected" # Set the text of the internet label
+            self.ctk_root.after(0, lambda: self.internet_label.configure(text=text)) # Update the text of the internet label
+
+    def exit_program(self): # exit_program method exits the program
+        self.ctk_root.destroy() # Destroy the window
+
+    def check_internet(self): # check_internet method checks the internet connection
+        try: # Try to send a GET request to google.com
+            r = requests.get('http://google.com') # Send the GET request
+            self.internet_connected = r.status_code == 200 # Set the internet_connected variable to True if the status code of the response is 200
+        except requests.exceptions.RequestException: # If the request fails, set the internet_connected variable to False
+            self.internet_connected = False # Set the internet_connected variable to False
+
+        if not self.internet_connected: # If the internet is not connected, show an error message and exit the program
+            self.show_error_and_exit()  # Call the show_error_and_exit method with an empty tuple as the argument
+
+        self.update_internet_label()  # Call the update_internet_label method
+
+    def show_error_and_exit(self): # show_error_and_exit method shows an error message and exits the program
+        messagebox.showerror("Error 01 : No Internet", "Error 01 : No Internet | Please connect to the internet and restart the application.") # Show an error message
+        self.ctk_root.quit()  # Stop the mainloop
+        self.ctk_root.destroy()  # Destroy the window  
+
+    # File Dialog —————————————————————————————————————————————
+
+    def open_file(self): # open_file method opens a file dialog and calls the recognize_song method
+        filepath = filedialog.askopenfilename() # Open a file dialog and get the filepath
+        if filepath: # If a file is selected, call the recognize_song method
+            if filepath.endswith('.mp3'): # If the file is an MP3 file, call the recognize_song method
+                if verbose == True: # If verbose mode is enabled, print the filepath to the console
+                    print(f"File opened: {filepath}") # Print the filepath to the console
+                self.processing = True # Set the processing variable to True
+                self.ctk_root.after(0, self.animate_processing_label) # Call the animate_processing_label method
+                threading.Thread(target=self.run_recognize_song_in_thread, args=(filepath, verbose)).start() # Create a new thread to call the recognize_song method
+            else: # If the file is not an MP3 file, show an error message
+                messagebox.showwarning("Error 02: Invalid File", "Error 02: Invalid File | Please select an MP3 file.") # If no file is selected, show a warning message
+
+    # Runs the Song Recognition and Grab Related Songs —————————————————————————————————————————————
+
+    def run_recognize_song_in_thread(self, filepath, verbose): # run_recognize_song_in_thread method runs the recognize_song method in a new thread
+        self.processing = True
+        thread = threading.Thread(target=self.thread_target, args=(filepath, verbose)) # Create a new thread to call the thread_target method
+        thread.start() # Start the thread
+
+    def thread_target(self, filepath, verbose): # thread_target method runs the recognize_song method in a new thread
+        loop = asyncio.new_event_loop() # Create a new event loop
+        asyncio.set_event_loop(loop) # Set the event loop
+        try: # Try to run the recognize_song method
+            loop.run_until_complete(self.recognize_song(filepath, verbose)) # Call the recognize_song method
+        finally: # Finally, close the event loop
+            loop.close() # Close the event loop
+
+    async def recognize_song(self, filepath, verbose): # recognize_song method recognizes the song from the given filepath
+        shazam = Shazam() # Create a new instance of the Shazam class
+        track = await self.fetch_track(shazam, filepath) # Call the fetch_track method
+        await self.fetch_related_tracks(shazam, track, verbose) # Call the fetch_related_tracks method
+
+    async def fetch_track(self, shazam, filepath): # fetch_track method recognizes the song from the given filepath
+        out = await shazam.recognize_song(filepath) # Call the recognize_song method of the Shazam class
+        track = out['track'] # Get the track from the output
+        self.identified_song = self.format_song_details(track) # Format the song details and set the identified_song variable
+        if verbose: # If verbose mode is enabled, print the identified song to the console
+            print(self.identified_song) # Print the identified song to the console
+        return track # Return the track
+
+    async def fetch_related_tracks(self, shazam, track, verbose): # fetch_related_tracks method fetches related songs from the Shazam API
+        related = await shazam.related_tracks(track_id=track['key'], limit=5, offset=0) # Call the related_tracks method of the Shazam class
+        for related_track in related.get('tracks', []): # Iterate through the related tracks
+            full_track_info = await shazam.track_about(track_id=related_track['key']) # Call the track_about method of the Shazam class
+            song_details = self.format_song_details(full_track_info) # Format the song details
+            if verbose == True: # If verbose mode is enabled, print the related song to the console
+                print(song_details) # Print the related song to the console
+            await self.search_youtube(related_track['title'], related_track['subtitle']) # Call the search_youtube method to search for the song on YouTube
+        self.processing = False # Set the processing variable to False
+        if verbose: # If verbose mode is enabled, print two messages to the console
+            print("Disabling Startup Menu Verbose Mode") # Print a message to the console
+            print("Enabling Download Window Verbose Mode") # Print a message to the console
+            print("Starting Download Window") # Print a message to the console
+        self.ctk_root.after(0, self.transition_to_download_window) # Call the transition_to_main_window method
+
+    def format_song_details(self, track): # format_song_details method formats the song details into a string
+        album_name = 'Unknown Album' # Album name
+        primary_genre = 'Unknown Genre' # Primary genre
+        album_cover = 'Unknown Cover' # Album cover
+        
+        for section in track.get('sections', []): # Iterate through the sections of the track
+            if 'metadata' in section: # If the section contains metadata, iterate through the metadata
+                for metadata_item in section['metadata']: # Iterate through the metadata items
+                    if metadata_item.get('title').lower() == 'album': # If the title of the metadata item is 'album', set the album name
+                        album_name = metadata_item.get('text', album_name) # Set the album name
+        
+        primary_genre = track.get('genres', {}).get('primary', primary_genre) # Get the primary genre of the track
+
+        images = track.get('images', {}) # Get the images of the track
+        album_cover = images.get('coverarthq', album_cover) # Get the album cover of the track
+
+        song_details = f"{track.get('title', 'Unknown Title')} by {track.get('subtitle', 'Unknown Artist')}" # Format the song details
+        if album_name != 'Unknown Album': # If the album name is not 'Unknown Album', add it to the song details
+            song_details += f" | Album: {album_name}" # Return the formatted song details
+        if primary_genre != 'Unknown Genre': # If the primary genre is not 'Unknown Genre', add it to the song details
+            song_details += f" | Genre {primary_genre}" # Return the formatted song details
+        if album_cover != 'Unknown Cover': # If the album cover is not 'Unknown Cover', add it to the song details
+            song_details += f" | Album Cover {album_cover}" # Return the formatted song details
+
+        connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+        cursor=connection.cursor() # Create a cursor object
+        cursor.execute("INSERT INTO Songs (Song_Title, Song_Album, Song_Artist, Song_Genre, Cover_Art_URL) VALUES (?, ?, ?, ?, ?)", (track.get('title', 'Unknown Title'), album_name, track.get('subtitle', 'Unknown Artist'), primary_genre, album_cover)) # Insert the song details into the database
+        connection.commit() # Commit the changes to the database
+        connection.close()  # Close the connection to the database
+        
+        self.song_details_list.append(song_details) # Append the song data to the song details list
+        return song_details # Return the formatted song details
+
+    async def search_youtube(self, title, artist): # search_youtube method searches for the song on YouTube
+        query = f"{title} {artist}" # Create a query for the song
+        try: # Try to send a GET request to the YouTube API
+            params = { # Set the parameters for the YouTube API request
+                'part': 'snippet', 
+                'q': query, 
+                'maxResults': 1,
+                'type': 'video',
+                #'key': 'AIzaSyCAO0MtrRSfn2Lt08jU07oFo6d_CUxzIhU'
+            }
+            response = requests.get('https://www.googleapis.com/youtube/v3/search', params=params) # Send the GET request to the YouTube API
+            response.raise_for_status() # Raise an exception if the status code of the response is not 200
+            data = response.json() # Get the JSON data from the response
+            self.youtube_link = f"https://www.youtube.com/watch?v={data['items'][0]['id']['videoId']}" if data['items'] else 'No YouTube results found.' # Get the YouTube link from the JSON data
+            if verbose == True: # If verbose mode is enabled, print the YouTube link to the console
+                print("YouTube Link:", self.youtube_link) # Print the YouTube link to the console
+            try:
+                connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+            except: # If the connection to the database fails, show an error message
+                if verbose:
+                    print("Error: Could not assign youtube URL to database")
+            cursor=connection.cursor() # Create a cursor object
+            cursor.execute("UPDATE Songs SET Youtube_URL = ? WHERE Song_Title = ?", (self.youtube_link, title)) # Update the YouTube link in the database
+            connection.commit() # Commit the changes to the database
+            connection.close() # Close the connection to the database
+        except requests.exceptions.RequestException as e: # If the request fails, show an error message
+            pass
+            #messagebox.showwarning("YouTube API Error", "Error: Please try again. (This may be an API limit reached; if so, please wait for servers to reset)") # Show a warning message
+            #self.ctk_root.quit()  # Stop the mainloop
+            #self.ctk_root.destroy()  # Destroy the window  
+
+    # Transition to Download Window —————————————————————————————————————————————
+    
+    def transition_to_download_window(self): # transition_to_main_window method transitions to the main window
+        self.ctk_root.destroy()  # Close the startup menu window
+        download_window = DownloadWindow()  # Assuming MainWindow is similar structure to StartupMenu
+        download_window.create_window()  # Here you define the GUI setup for Main Window just like in StartupMenu
+
+# StartupMenu Class End —————————————————————————————————————————————
+
+# DownloadWindow Class —————————————————————————————————————————————
+class DownloadWindow(): # MainWindow class defines the main window of the application
+    def __init__(self): # Constructor initializes all the necessary UI components to None
+        self.title_label = None # Title label
+        self.button_frame = None # Button frame
+        self.related_songs = [] # Related songs
+        self.subtitle_label = None # Subtitle label
+        self.identified_song = "" # Identified song
+        self.internet_connected = True # Internet connection status
+        
+    def create_window(self): # create_window method sets up the window and UI components
+        self.ctk_root = ctk() # Create the Tkinter root window
+        self.ctk_root.title("PULSE: Download Manager") # Set the title of the window
+        self.ctk_root.resizable(True, True) # Disable resizing of the window
+        screen_width = self.ctk_root.winfo_screenwidth()
+        screen_height = self.ctk_root.winfo_screenheight()
+        window_width = int(screen_width * 2 / 3)
+        window_height = int(screen_height * 3 / 4)
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.ctk_root.geometry(f"{window_width}x{window_height}+{x}+{y})") # Set the geometry of the window to center it on the screen
+
+       # Gathering Song Data from Database —————————————————————————————————————————————
+        
+        connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+        cursor=connection.cursor() # Create a cursor object
+
+        cursor.execute("SELECT * FROM Songs ORDER BY ID DESC LIMIT 1 OFFSET 5") # Gather the input song from the database
+        input_song=cursor.fetchone()
+        cursor.execute("UPDATE Songs SET Downloaded = 1 WHERE ID = ?", (input_song[0],)) # Update the YouTube link in the database
+
+        cursor.execute("SELECT * FROM Songs ORDER BY ID DESC LIMIT 1 OFFSET 4") # Gather the first related song from the database
+        recsong1=cursor.fetchone()
+
+        cursor.execute("SELECT * FROM Songs ORDER BY ID DESC LIMIT 1 OFFSET 3") # Gather the second related song from the database
+        recsong2=cursor.fetchone()
+
+        cursor.execute("SELECT * FROM Songs ORDER BY ID DESC LIMIT 1 OFFSET 2") # Gather the third related song from the database
+        recsong3=cursor.fetchone()
+        
+        cursor.execute("SELECT * FROM Songs ORDER BY ID DESC LIMIT 1 OFFSET 1") # Gather the fourth related song from the database
+        recsong4=cursor.fetchone()
+
+        cursor.execute("SELECT * FROM Songs ORDER BY ID DESC LIMIT 1 OFFSET 0") # Gather the fifth related song from the database
+        recsong5=cursor.fetchone()
+
+        connection.commit() # Commit the changes to the database
+        connection.close() # Close the connection to the database
+        
+        # Methods —————————————————————————————————————————————
+        
+        def load_image_from_url(url): # load_image_from_url method loads an image from a URL and returns it in a format that can be displayed
+            try: # Try to load the image from the URL
+                response = requests.get(url) # Send a GET request to the URL
+                image = Image.open(BytesIO(response.content)) # Open the image from the URL
+                image = image.resize((90, 90))  # Resize the image as per your requirements
+                photo_image = ImageTk.PhotoImage(image) # Convert the image to a format that can be displayed
+                return photo_image # Return the image
+            except Exception as e: # If the image cannot be loaded, print an error message to the console
+                print(f"Error loading image from URL: {e}") # Print the error to the console
+                return None # Return None if the image cannot be loaded
+
+        def download_audio(yturl): # download_audio method downloads the audio from a YouTube video
+            yt = YouTube(yturl) # Create a new YouTube object
+            video = yt.streams.filter(only_audio=True).first() # Get the first audio stream from the YouTube video
+            filepath = filedialog.asksaveasfile(defaultextension=".mp3") # Open a file dialog and get the filepath
+            if filepath: # If a file is selected, call the recognize_song method
+                if verbose: # If verbose mode is enabled, print the filepath to the console
+                    print(f"File Saved at : {filepath}") # Print the filepath to the console
+                output_path = filepath # Set the destination folder for the downloaded audio file
+            out_file = video.download(output_path) # type: ignore # Download the audio file
+            base, ext = os.path.splitext(out_file) # Split the file path into the base and extension
+            new_file = base + '.mp3' # Create a new file path with the .mp3 extension
+            os.rename(out_file, new_file) # Rename the downloaded file to have the .mp3 extension
+            if verbose: # If verbose mode is enabled, print a message to the console
+                print(yt.title + " has been successfully downloaded.")
+
+        def run_download_audio_in_thread(yturl):
+            thread = threading.Thread(target=download_audio, args=(yturl,))
+            thread.start()
+            
+        def transition_to_mixing_window(self): # transition_to_main_window method transitions to the main window
+            self.ctk_root.destroy()  # Close the startup menu window
+            mixing_window = MixingWindow()  # Assuming MainWindow is similar structure to StartupMenu
+            mixing_window.create_window()  # Here you define the GUI setup for Main Window just like in StartupMenu
+
+        # GUI Components —————————————————————————————————————————————
+
+        #Top Bar —————————————————————————————————————————————
+        frame = CTkFrame(self.ctk_root) # Create a frame for the title and buttons
+        frame.pack(anchor="n", padx=10, pady=5, fill="both", expand=False) # Pack the frame at the top of the window with padding
+
+        self.title_label = CTkLabel(frame, text="PULSE AUDIO | Main Window", font=("Helvetica", 30, "bold")) # Create the title label
+        self.title_label.pack(side="left", padx=10, pady=10) # Pack the title label with padding
+
+        self.button = CTkButton(frame, text="Mixing Window", command=lambda: transition_to_mixing_window(self)) # Create the button
+        self.button.pack(side="right", padx=10, pady=10)
+
+        self.button = CTkButton(frame, text="Verbose Mode", command=self.verbose_mode) # Create the button
+        self.button.pack(side="right", padx=10, pady=10) # Pack the button with padding
+        
+        # Main Frame —————————————————————————————————————————————
+        main_frame = CTkFrame(self.ctk_root) # Create a frame for the main content
+        main_frame.pack(anchor="center", padx=10, pady=5, fill="both", expand=True) # Pack the frame at the top of the window with padding
+
+        # Input Song
+        input_song_frame = CTkFrame(main_frame) # Create a frame for the input song
+        input_song_frame.pack(anchor="center", padx=10, pady=5, fill="both", expand=True) # Pack the frame at the top of the window with padding
+
+        # Load album art for the input song
+        album_art_image: CTkImage = load_image_from_url(str(input_song[5])) # type: ignore
+        if album_art_image: # Load album art for the input song
+            album_art_label = CTkLabel(input_song_frame, image=album_art_image, text="") # Create the album art label
+            album_art_label.pack(side="left") # Pack the image label to the left
+
+            text_label = CTkLabel(input_song_frame, text="Input Song | "f"{input_song[1]}", font=("Helvetica", 20, "bold"), justify="left") # Create the song label
+            text_label.pack(anchor="nw", padx=(10, 10)) # Pack the song label with padding
+            details_label = CTkLabel(input_song_frame, text=f"Album: {input_song[2]}\nArtist: {input_song[3]}\nGenre: {input_song[4]}", font=("Helvetica", 14), justify="left") # Create the details label
+            details_label.pack(anchor="nw", padx=(10, 10)) # Pack the details label with padding
+        
+        # Related Songs —————————————————————————————————————————————
+        #1
+        related_song1_frame = CTkFrame(main_frame) # Create a frame for the first related song
+        related_song1_frame.pack(anchor="center", padx=10, pady=5, fill="both", expand=True)  # Pack the frame at the top of the window with padding
+
+        album_art_image: CTkImage = load_image_from_url(str(recsong1[5]))  # type: ignore
+        if album_art_image: # Load album art for the related song
+            album_art_label = CTkLabel(related_song1_frame, image=album_art_image, text="")  # Create the album art label
+            album_art_label.pack(side="left")  # Pack the image label to the left
+
+            text_label = CTkLabel(related_song1_frame, text=f"{recsong1[1]}", font=("Helvetica", 20, "bold"), justify="left") # Create the text label
+            text_label.pack(anchor="nw", padx=(10, 10))  # Pack the text label to the left next to the image
+            details_label = CTkLabel(related_song1_frame, text=f"Album: {recsong1[2]}\nArtist: {recsong1[3]}\nGenre: {recsong1[4]}", font=("Helvetica", 14), justify="left") # Create the text label
+            details_label.pack(anchor="nw", padx=(10, 10))  # Pack the text label to the left next to the image
+            download_audio_button = CTkButton(related_song1_frame, text="Download Audio", command=lambda: mark_rec1_downloaded(recsong1)) # Create the download audio button
+            download_audio_button.pack(anchor="e", padx=(10, 10)) # Pack the download audio button opposite to the image and text
+            def mark_rec1_downloaded(recsong1): # mark_rec1_downloaded method marks the first related song as downloaded
+                run_download_audio_in_thread(recsong1[6]) # Call the download_audio method in a new thread
+                connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+                cursor=connection.cursor() # Create a cursor object
+                cursor.execute("UPDATE Songs SET Downloaded = 1 WHERE ID = ?", (recsong1[0],)) # Update the YouTube link in the database
+                connection.commit() # Commit the changes to the database
+                connection.close()  # Close the connection to the database
+
+        #2
+        related_song2_frame = CTkFrame(main_frame) # Create a frame for the second related song
+        related_song2_frame.pack(anchor="center", padx=10, pady=5, fill="both", expand=True) # Pack the frame at the top of the window with padding
+
+        album_art_image: CTkImage = load_image_from_url(str(recsong2[5])) # type: ignore # Load album art for the related song
+        if album_art_image: # Load album art for the related song
+            album_art_label = CTkLabel(related_song2_frame, image=album_art_image, text="")  # Create the album art label
+            album_art_label.pack(side="left")  # Pack the image label to the left
+
+            text_label = CTkLabel(related_song2_frame, text=f"{recsong2[1]}", font=("Helvetica", 20, "bold"), justify="left") # Create the song label
+            text_label.pack(anchor="nw", padx=(10, 10)) # Pack the song label with padding
+            details_label = CTkLabel(related_song2_frame, text=f"Album: {recsong2[2]}\nArtist: {recsong2[3]}\nGenre: {recsong2[4]}", font=("Helvetica", 14), justify="left") # Create the details label
+            details_label.pack(anchor="nw", padx=(10, 10)) # Pack the details label with padding
+            download_audio_button = CTkButton(related_song2_frame, text="Download Audio", command=lambda: mark_rec2_downloaded(recsong2)) # Create the download audio button
+            download_audio_button.pack(anchor="e", padx=(10, 10)) # Pack the download audio button opposite to the image and text
+            def mark_rec2_downloaded(recsong2): # mark_rec2_downloaded method marks the second related song as downloaded
+                run_download_audio_in_thread(recsong2[6]) # Call the download_audio method in a new thread
+                connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+                cursor=connection.cursor() # Create a cursor object
+                cursor.execute("UPDATE Songs SET Downloaded = 1 WHERE ID = ?", (recsong2[0],)) # Update the YouTube link in the database
+                connection.commit() # Commit the changes to the database
+                connection.close() # Close the connection to the database
+
+        #3
+        related_song3_frame = CTkFrame(main_frame) # Create a frame for the third related song
+        related_song3_frame.pack(anchor="center", padx=10, pady=5, fill="both", expand=True) # Pack the frame at the top of the window with padding
+
+        album_art_image: CTkImage = load_image_from_url(str(recsong3[5])) # type: ignore # Load album art for the related song
+        if album_art_image: # Load album art for the related song
+            album_art_label = CTkLabel(related_song3_frame, image=album_art_image, text="") # Create the album art label
+            album_art_label.pack(side="left") # Pack the image label to the left
+
+            text_label = CTkLabel(related_song3_frame, text=f"{recsong3[1]}", font=("Helvetica", 20, "bold"), justify="left") # Create the song label
+            text_label.pack(anchor="nw", padx=(10, 10)) # Pack the song label with padding
+            details_label = CTkLabel(related_song3_frame, text=f"Album: {recsong3[2]}\nArtist: {recsong3[3]}\nGenre: {recsong3[4]}", font=("Helvetica", 14), justify="left") # Create the details label
+            details_label.pack(anchor="nw", padx=(10, 10)) # Pack the details label with padding
+            download_audio_button = CTkButton(related_song3_frame, text="Download Audio", command=lambda: mark_rec3_downloaded(recsong3)) # Create the download audio button
+            download_audio_button.pack(anchor="e", padx=(10, 10)) # Pack the download audio button opposite to the image and text
+            def mark_rec3_downloaded(recsong3): # mark_rec3_downloaded method marks the third related song as downloaded
+                run_download_audio_in_thread(recsong3[6]) # Call the download_audio method in a new thread
+                connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+                cursor=connection.cursor() # Create a cursor object
+                cursor.execute("UPDATE Songs SET Downloaded = 1 WHERE ID = ?", (recsong3[0],)) # Update the YouTube link in the database
+                connection.commit() # Commit the changes to the database
+                connection.close() # Close the connection to the database
+        #4
+        related_song4_frame = CTkFrame(main_frame) # Create a frame for the fourth related song
+        related_song4_frame.pack(anchor="center", padx=10, pady=5, fill="both", expand=True) # Pack the frame at the top of the window with padding
+
+        album_art_image: CTkImage = load_image_from_url(str(recsong4[5])) # type: ignore # Load album art for the related song
+        if album_art_image: # Load album art for the related song
+            album_art_label = CTkLabel(related_song4_frame, image=album_art_image, text="") # Create the album art label
+            album_art_label.pack(side="left") # Pack the image label to the left
+            
+            text_label = CTkLabel(related_song4_frame, text=f"{recsong4[1]}", font=("Helvetica", 20, "bold"), justify="left") # Create the song label
+            text_label.pack(anchor="nw", padx=(10, 10)) # Pack the song label with padding
+            details_label = CTkLabel(related_song4_frame, text=f"Album: {recsong4[2]}\nArtist: {recsong4[3]}\nGenre: {recsong4[4]}", font=("Helvetica", 14), justify="left") # Create the details label
+            details_label.pack(anchor="nw", padx=(10, 10)) # Pack the details label with padding
+            download_audio_button = CTkButton(related_song4_frame, text="Download Audio", command=lambda: mark_rec4_downloaded(recsong4)) # Create the download audio button
+            download_audio_button.pack(anchor="e", padx=(10, 10)) # Pack the download audio button opposite to the image and text
+            def mark_rec4_downloaded(recsong4): # mark_rec4_downloaded method marks the fourth related song as downloaded
+                run_download_audio_in_thread(recsong4[6]) # Call the download_audio method in a new thread
+                connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+                cursor=connection.cursor() # Create a cursor object
+                cursor.execute("UPDATE Songs SET Downloaded = 1 WHERE ID = ?", (recsong4[0],)) # Update the YouTube link in the database
+                connection.commit() # Commit the changes to the database
+                connection.close() # Close the connection to the database
+
+        #5
+        related_song5_frame = CTkFrame(main_frame) # Create a frame for the fifth related song
+        related_song5_frame.pack(anchor="center", padx=10, pady=10, fill="both", expand=True) # Pack the frame at the top of the window with padding
+        
+        album_art_image: CTkImage = load_image_from_url(str(recsong5[5])) # type: ignore # Load album art for the related song
+        if album_art_image: # Load album art for the related song
+            album_art_label = CTkLabel(related_song5_frame, image=album_art_image, text="") # Create the album art label
+            album_art_label.pack(side="left") # Pack the image label to the left
+
+            text_label = CTkLabel(related_song5_frame, text=f"{recsong5[1]}", font=("Helvetica", 20, "bold"), justify="left") # Create the song label
+            text_label.pack(anchor="nw", padx=(10, 10)) # Pack the song label with padding
+            details_label = CTkLabel(related_song5_frame, text=f"Album: {recsong5[2]}\nArtist: {recsong5[3]}\nGenre: {recsong5[4]}", font=("Helvetica", 14), justify="left") # Create the details label
+            details_label.pack(anchor="nw", padx=(10, 10)) # Pack the details label with padding
+            download_audio_button = CTkButton(related_song5_frame, text="Download Audio", command=lambda: mark_rec5_downloaded(recsong5)) # Create the download audio button
+            download_audio_button.pack(anchor="e", padx=(10, 10)) # Pack the download audio button opposite to the image and text
+            def mark_rec5_downloaded(recsong5): # mark_rec5_downloaded method marks the fifth related song as downloaded
+                run_download_audio_in_thread(recsong5[6]) # Call the download_audio method in a new thread
+                connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+                cursor=connection.cursor() # Create a cursor object
+                cursor.execute("UPDATE Songs SET Downloaded = 1 WHERE ID = ?", (recsong5[0],)) # Update the YouTube link in the database
+                connection.commit() # Commit the changes to the database
+                connection.close() # Close the connection to the database
+        
+        # —————————————————————————————————————————————
+
+        self.ctk_root.mainloop() # Start the Tkinter event loop
+
+    def verbose_mode(self):  # developer_menu method opens the developer menu
+        global verbose  # Global variable
+        verbose = not verbose  # Toggle the verbose variable
+        if verbose == True: # If verbose mode is enabled, print a message to the console
+            print("Main Menu Debug Mode Enabled")  # Print a message to the console
+        else: # If verbose mode is disabled, print a message to the console
+            print("Main Menu Debug Mode Disabled")  # Print a message to the console
+
+# DownloadWindow Class End —————————————————————————————————————————————
+
+# MixingWindow Class —————————————————————————————————————————————
+class MixingWindow(): # MainWindow class defines the main window of the application
+    def __init__(self): # Constructor initializes all the necessary UI components to None
+        self.title_label = None # Title label
+        self.button_frame = None # Button frame
+        self.related_songs = [] # Related songs
+        self.subtitle_label = None # Subtitle label
+        self.identified_song = "" # Identified song
+        self.internet_connected = True # Internet connection status
+        
+    def create_window(self): # create_window method sets up the window and UI components
+        self.ctk_root = ctk() # Create the Tkinter root window
+        self.ctk_root.title("PULSE: Mixing Window") # Set the title of the window
+        self.ctk_root.resizable(True, True) # Disable resizing of the window
+        screen_width = self.ctk_root.winfo_screenwidth()
+        screen_height = self.ctk_root.winfo_screenheight()
+        window_width = int(screen_width * 2 / 3)
+        window_height = int(screen_height * 3 / 4)
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+        
+        self.ctk_root.geometry(f"{window_width}x{window_height}+{x}+{y})") # Set the geometry of the window to center it on the screen
+        
+        def transition_to_download_window(self): # transition_to_main_window method transitions to the main window
+            self.ctk_root.destroy()  # Close the mixing menu window
+            download_window = DownloadWindow()  # Assuming MainWindow is similar structure to StartupMenu
+            download_window.create_window()  # Here you define the GUI setup for Main Window just like in StartupMenu
+        
+        def open_song(self): # open_song method opens a song file and calls the process_song method
+            messagebox.showinfo("Please Select Either an Inputed Song or a Downloaded Song") # If no file is selected, show a warning message
+            filepath = filedialog.askopenfilename()
+            if filepath: # If a file is selected, call the recognize_song method
+                if filepath.endswith('.mp3'): # If the file is an MP3 file, call the recognize_song method
+                    if verbose == True: # If verbose mode is enabled, print the filepath to the console
+                        print(f"File opened: {filepath}") # Print the filepath to the console
+                    # check if song is in databse and downloaded
+                    connection=sqlite3.connect("PulseDatabase.db") # Connect to the database
+                    cursor=connection.cursor() # Create a cursor object
+                    cursor.execute("SELECT * FROM Songs WHERE Song_Title = ?", (filepath,)) # Gather the input song from the database
+                    input_song=cursor.fetchone() # Get the input song from the database
+                    if input_song[7] == 1: # If the song is downloaded, call the process_song method
+                        self.process_song() # Call the process_song method
+                    else: # If the file is not an MP3 file, show a warning message
+                        messagebox.showerror("Please Select a Downloaded Song") # Show an error message
+                        connection.commit() # Commit the changes to the database
+                        connection.close() # Close the connection to the database
+                else: # If the file is not an MP3 file, show a warning message
+                    messagebox.showerror("Invalid File Type", "Please select an MP3 file.") # Show an error message
+                        
+        def process_song(self):
+            pass
+                        
+        #Top Bar —————————————————————————————————————————————
+        frame = CTkFrame(self.ctk_root) # Create a frame for the title and buttons
+        frame.pack(anchor="n", padx=10, pady=5, fill="both", expand=False) # Pack the frame at the top of the window with padding
+
+        self.title_label = CTkLabel(frame, text="PULSE AUDIO | Mixing Window", font=("Helvetica", 30, "bold")) # Create the title label
+        self.title_label.pack(side="left", padx=10, pady=10) # Pack the title label with padding
+
+        self.button = CTkButton(frame, text="Download Window", command=lambda: transition_to_download_window(self))
+        self.button.pack(side="right", padx=10, pady=10) # Pack the button with padding
+
+        self.button = CTkButton(frame, text="Verbose Mode", command=self.verbose_mode) # Create the button
+        self.button.pack(side="right", padx=10, pady=10) # Pack the button with padding
+        
+        #Main Frame
+        main_frame = CTkFrame(self.ctk_root) # Create a frame for the main content
+        main_frame.pack(anchor="center", padx=10, pady=5, fill="both", expand=True) # Pack the frame at the top of the window with padding
+        
+        # —————————————————————————————————————————————
+
+        self.ctk_root.mainloop() # Start the Tkinter event loop
+
+    def verbose_mode(self):  # developer_menu method opens the developer menu
+        global verbose  # Global variable
+        verbose = not verbose  # Toggle the verbose variable
+        if verbose == True: # If verbose mode is enabled, print a message to the console
+            print("Main Menu Debug Mode Enabled")  # Print a message to the console
+        else: # If verbose mode is disabled, print a message to the console
+            print("Main Menu Debug Mode Disabled")  # Print a message to the console
+
+# MixingWindow Class End —————————————————————————————————————————————
+
+# Main ————————————————————————————————————————————
+if __name__ == "__main__": # Program Start (Calling Window)
+    startup_menu = StartupMenu() # Create a new StartupMenu object
+    startup_menu.create_window() # Call the create_window method to create and display the windows
