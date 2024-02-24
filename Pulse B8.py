@@ -1,4 +1,4 @@
-# Pulse Beta 7 | Made by Alexander Richard Dennant | NEA Project for Computer Science
+# Pulse Beta 8 | Made by Alexander Richard Dennant | NEA Project for Computer Science
 
 # Imports —————————————————————————————————————————————
 import os
