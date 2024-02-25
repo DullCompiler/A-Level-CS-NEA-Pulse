@@ -1,15 +1,17 @@
-# Pulse Beta 1 | Made by Alexander Richard Dennant | NEA Project for Computer Science
+# Pulse Beta 2 | Made by Alexander Richard Dennant | NEA Project for Computer Science
 
-# Imports ------------------------------------------------------------------------------------------------------
-import requests                                            # For the check internet function
-from tkinter import filedialog                             # For the open file function
-from tkinter import messagebox                             # For the warning message about Internet Connectivity
-from customtkinter import CTk as ctk                       # Main class for CustomTkinter (ctk), seems to be used for creating the UI (ctk_root)
-from customtkinter import CTkLabel, CTkButton, CTkFrame    # Components from CustomTkinter (ctk)
+# Imports —————————————————————————————————————————————
+import asyncio
+import requests
+from shazamio import Shazam
+from tkinter import filedialog
+from tkinter import messagebox
+from customtkinter import CTk as ctk
+from customtkinter import CTkLabel, CTkButton, CTkFrame
 
-# Start Up Menu ------------------------------------------------------------------------------------------------
+# Start Up Menu —————————————————————————————————————————————
 
-# Check internet connectivity 
+# Check internet connectivity
 def check_internet():
     try:
         r = requests.get('http://google.com')
@@ -17,19 +19,37 @@ def check_internet():
     except:
         return False
 
-# Define functions for each button
+# Shazamio Function (Get Song Name and Artist and Recomend Similar Songs)
+async def main():
+    # Initialize Shazam class
+    shazam = Shazam()
+
+    # Make a Shazam of the audio file
+    out = await shazam.recognize_song(filepath)
+
+    # Get track data
+    track = out['track']
+    print(f"Title: {track['title']}, Artist: {track['subtitle']}")
+
+    # Get related tracks
+    related = await shazam.related_tracks(track_id=track['key'], limit=5, offset=0)
+    for related_track in related['tracks']:
+        title = related_track['title']
+        artist = related_track['subtitle']
+        print(f"\nRelated song: {title} by {artist}")
+
+# File Handling —————————————————————————————————————————————
 def open_file():
+    global filepath
     filepath = filedialog.askopenfilename()
     if filepath:
         print(f"File opened: {filepath}")
-
-def save_file():
-    filepath = filedialog.asksaveasfilename(defaultextension=".txt")
-    if filepath:
-        print(f"File saved: {filepath}")
+        asyncio.run(main())
 
 def exit_program():
     ctk_root.destroy()
+
+# GUI Start —————————————————————————————————————————————
 
 def center_window(width=500, height=240):
     # get screen width and height
@@ -72,10 +92,11 @@ internet_label.pack(padx=20, pady=20)
 button_frame = CTkFrame(ctk_root)
 button_frame.pack(side="bottom", pady=20)
 
-CTkButton(button_frame, text='Exit', command=exit_program).pack(side="left", padx=(0, 10))
-CTkButton(button_frame, text='Open File', command=open_file).pack(side="left", padx=10)
-CTkButton(button_frame, text='New File', command=save_file).pack(side="left", padx=(10, 0))
+CTkButton(button_frame, text='Exit', command=exit_program).pack(side="left", padx=(0, 5))
+CTkButton(button_frame, text='Open File', command=open_file).pack(side="left", padx=(5, 0))
 
 ctk_root.mainloop()
 
-#End of Start Up Menu ------------------------------------------------------------------------------------------
+#GUI End —————————————————————————————————————————————
+
+#Program End —————————————————————————————————————————————
