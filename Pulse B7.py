@@ -213,11 +213,11 @@ class StartupMenu: # StartupMenu class defines the startup menu of the applicati
     async def search_youtube(self, title, artist): # search_youtube method searches for the song on YouTube
         query = f"{title} {artist}" # Create a query for the song
         api_keys = [
-            'AIzaSyCAO0MtrRSfn2Lt08jU07oFo6d_CUxzIhU',
-            'AIzaSyBf0SA93_uXcsOHQJwcs6I2YAIzFCeVW2A',
-            'AIzaSyCzXKaOWuLFERxAhq7yUMe4KktTArlHtyc',
-            'AIzaSyC5dgqDjDWUWJbu9jsBWSGFjJqg9tca3Ok',
-            'AIzaSyABeEZmMgFqmV2EF8st-hbrccZu0nEKuB8'
+            'insert youtube api key',
+            'insert youtube api key',
+            'insert youtube api key',
+            'insert youtube api key',
+            'insert youtube api key'
         ]
         for key in api_keys:
             try: # Try to send a GET request to the YouTube API
