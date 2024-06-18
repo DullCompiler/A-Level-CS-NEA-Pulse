@@ -208,7 +208,7 @@ class StartupMenu: # StartupMenu class defines the startup menu of the applicati
                 'q': query, 
                 'maxResults': 1,
                 'type': 'video',
-                #'key': 'AIzaSyCAO0MtrRSfn2Lt08jU07oFo6d_CUxzIhU'
+                'key': 'insert youtube api key'
             }
             response = requests.get('https://www.googleapis.com/youtube/v3/search', params=params) # Send the GET request to the YouTube API
             response.raise_for_status() # Raise an exception if the status code of the response is not 200
